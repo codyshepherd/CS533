@@ -29,10 +29,7 @@ thread * current_thread;
 thread * inactive_thread;
 
 //function that does nothing
-void nothing(void * arg){
-    int t = *(int*)arg;
-    printf("Did nothing with your argument: %d\n", t);
-}
+void nothing(void * arg);
 
 //thread switching function implemented in assembly
 void thread_switch(thread * old, thread * new);
@@ -41,9 +38,11 @@ void thread_switch(thread * old, thread * new);
 void thread_start(thread * old, thread * new);
 
 //initial function caller wrapper
-void thread_wrap(){
-    current_thread->initial_function(current_thread->initial_argument);
-}
+void thread_wrap();
+
+//swap current thread and inactive thread
+void yield();
+
 
 
 int main(int argc, char * argv[]){
@@ -67,15 +66,37 @@ int main(int argc, char * argv[]){
     //allocate struct in memory
     inactive_thread = (thread*)malloc(sizeof(thread));
 
-    //ugly function call
-    //current_thread->initial_function(current_thread->initial_argument);
-
     thread_start(inactive_thread, current_thread);
-    //thread_start(current_thread, inactive_thread);
+
+    int * q = malloc(sizeof(int));
+    *q = 665;
+    nothing(q);
+
+    return 0;
 }
 
 
+void nothing(void * arg){
+    int t = *(int*)arg;
+    int i = 0;
+    for(i = t; i > 0; --i){
+        if (!(i%2) && !(t%2)) printf("%d\n", i);
+        else if (!(i%5) && (t%2)) printf("%d\n", i);
+        yield();
+    }
+}
 
+void thread_wrap(){
+    current_thread->initial_function(current_thread->initial_argument);
+    yield();
+}
+
+void yield(){
+    thread * temp = current_thread;
+    current_thread = inactive_thread;
+    inactive_thread = temp;
+    thread_switch(inactive_thread, current_thread);
+}
 
 
 
