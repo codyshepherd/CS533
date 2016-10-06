@@ -77,14 +77,8 @@ int main(int argc, char * argv[]){
 
 //decrement argument and print its value, yielding at bottom of each loop
 void count_down(void * arg){
-    int checker = 666;
     while(*(int*)arg > 0){
-        checker-=2;
         --*(int*)arg;
-        if(checker != *(int*)arg){
-            printf("race condition!\n");
-            return;
-        }
         printf("%d\n", *(int*)arg);
         yield();
     }
