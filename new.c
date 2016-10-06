@@ -7,8 +7,8 @@
 //stack size = 1 MB (1024 ^ 2 bytes)
 const int STACK_SIZE = 1048576;
 
-//struct representing a thread control block (TCB)
 typedef unsigned char byte;
+//struct representing a thread control block (TCB)
 struct thread
 {
     //stack pointer
@@ -28,8 +28,8 @@ thread * current_thread;
 //global ptr for inactive thread
 thread * inactive_thread;
 
-//function that does nothing
-void nothing(void * arg);
+//function that does some work
+void count_down(void * arg);
 
 //thread switching function implemented in assembly
 void thread_switch(thread * old, thread * new);
@@ -52,7 +52,7 @@ int main(int argc, char * argv[]){
     current_thread = (thread*)malloc(sizeof(thread));
 
     //set the fn ptr to point at our dumb function
-    current_thread->initial_function = nothing;
+    current_thread->initial_function = count_down;
 
     //give the initial arg ptr something to point at
     int * p = malloc(sizeof(int));
@@ -66,22 +66,26 @@ int main(int argc, char * argv[]){
     //allocate struct in memory
     inactive_thread = (thread*)malloc(sizeof(thread));
 
+    //start new thread and initiate work
     thread_start(inactive_thread, current_thread);
 
-    int * q = malloc(sizeof(int));
-    *q = 665;
-    nothing(q);
+    //do some work in main thread with shared resource
+    count_down(p);
 
     return 0;
 }
 
-
-void nothing(void * arg){
-    int t = *(int*)arg;
-    int i = 0;
-    for(i = t; i > 0; --i){
-        if (!(i%2) && !(t%2)) printf("%d\n", i);
-        else if (!(i%5) && (t%2)) printf("%d\n", i);
+//decrement argument and print its value, yielding at bottom of each loop
+void count_down(void * arg){
+    int checker = 666;
+    while(*(int*)arg > 0){
+        checker-=2;
+        --*(int*)arg;
+        if(checker != *(int*)arg){
+            printf("race condition!\n");
+            return;
+        }
+        printf("%d\n", *(int*)arg);
         yield();
     }
 }
