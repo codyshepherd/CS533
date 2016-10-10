@@ -72,6 +72,9 @@ int main(int argc, char * argv[]){
     //do some work in main thread with shared resource
     count_down(p);
 
+    free(p);
+    free(inactive_thread);
+    free(current_thread);
     return 0;
 }
 
