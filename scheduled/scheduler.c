@@ -13,7 +13,7 @@ struct queue done_list;         // Holds done threads waiting to be recycled
 
 
 void scheduler_begin(){
-    printf("Allocating first block\n");
+    printf("Allocating first TCB\n");
 
     //allocate a struct for when the main thread gets switched out
     current_thread = (thread*)malloc(sizeof(thread));
@@ -22,11 +22,22 @@ void scheduler_begin(){
     //null-initialize the queue pointers, because they're empty
     ready_list.head = ready_list.tail = NULL;
     done_list.head = done_list.tail = NULL;
-    read_list.count = done_list.count = 0;
+    ready_list.count = done_list.count = 0;
 }
 
 void thread_fork(void(*target)(void*), void * arg){
     thread * forked_thread = NULL;
+    thread * temp = NULL;
+
+    while(done_list.count > 9){             //Trim the recycle queue
+        printf("Trimming dead queue\n");   
+        temp = thread_dequeue(&done_list);
+        temp->stack_pointer = NULL;
+        free(temp->initial_argument);
+        free(temp->sp_btm);
+        free(temp);
+    }
+    temp = NULL;
 
     if(!is_empty(&done_list)){      // Check on the recyclable list first
 
@@ -36,7 +47,7 @@ void thread_fork(void(*target)(void*), void * arg){
     }
     else {
 
-        printf("Allocating new block\n");
+        printf("Allocating new TCB\n");
 
         forked_thread = (thread*)malloc(sizeof(thread));
         forked_thread->initial_function = target;
@@ -57,7 +68,7 @@ void thread_fork(void(*target)(void*), void * arg){
     thread_enqueue(&ready_list, current_thread);
 
     //swap out current thread and run it
-    thread * temp = current_thread;
+    temp = current_thread;
     current_thread = forked_thread;
 
     thread_start(temp, forked_thread);

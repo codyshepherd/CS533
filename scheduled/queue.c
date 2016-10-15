@@ -26,7 +26,7 @@ void thread_enqueue(struct queue * q, struct thread * t) {
   q->tail->next = temp;
   q->tail = temp;  
 
-    ++count; // Cody's mod
+    ++q->count; // Cody's mod to support queue trimming
 
 }
 
@@ -45,7 +45,7 @@ struct thread * thread_dequeue(struct queue * q) {
     q->tail = NULL;
   }
 
-    --count; // Cody's mod
+    --q->count; // Cody's mod to support queue trimming
 
   return t;
 
