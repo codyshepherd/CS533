@@ -15,6 +15,7 @@ struct queue_node {
 struct queue {
   struct queue_node * head;
   struct queue_node * tail;
+  int count;            //Cody's Modification
 };
 
 void thread_enqueue(struct queue * q, struct thread * t);
