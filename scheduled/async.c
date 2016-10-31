@@ -33,6 +33,7 @@ ssize_t read_wrap(int fd, void * buf, size_t count) {
     while(aio_error(a) == EINPROGRESS)
         yield();
     
+    ssize_t ret = aio_return(a);
     free(a);
-    return aio_return(a);
+    return ret;
 }

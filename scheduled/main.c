@@ -40,6 +40,10 @@ int main(int argc, char * argv[]){
 
   scheduler_end();
 
+  #ifndef TERM
+  close(fd);
+  #endif
+
     return 0;
 }
 
@@ -64,9 +68,6 @@ void wrap_read_wrap(void*arg){
 
     int rd = read_wrap(fd, buf, sz);
 
-    #ifndef TERM
-    close(fd);
-    #endif
 
     printf("Contents: \n");
     printf("%s", buf);
@@ -77,6 +78,7 @@ void wrap_read_wrap(void*arg){
     
     #ifndef TERM
     free(buf);
+    buf = NULL;
     #endif
 }
 
