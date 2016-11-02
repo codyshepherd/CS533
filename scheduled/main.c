@@ -1,7 +1,7 @@
 //Cody Shepherd
 //CS 533
 //#define SLICE
-#define TERM
+//#define TERM
 
 #include "scheduler.h"
 #include <unistd.h>

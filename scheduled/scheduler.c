@@ -51,7 +51,7 @@ void thread_fork(void(*target)(void*), void * arg){
 
         forked_thread = (thread*)malloc(sizeof(thread));
         forked_thread->initial_function = target;
-        forked_thread->initial_argument = (int*)malloc(sizeof(int));
+        //forked_thread->initial_argument = (int*)malloc(sizeof(int));
         forked_thread->sp_btm = malloc(STACK_SIZE);
 
     }
@@ -90,7 +90,7 @@ void scheduler_end(){
     while(!is_empty(&done_list)){
         temp = thread_dequeue(&done_list);
         temp->stack_pointer = NULL;
-        free(temp->initial_argument);
+        //free(temp->initial_argument);
         free(temp->sp_btm);
         free(temp);
     }
