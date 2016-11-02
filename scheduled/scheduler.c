@@ -56,10 +56,13 @@ void thread_fork(void(*target)(void*), void * arg){
 
     }
 
-    if(arg == 0)
+/*
+    if(!arg)
         forked_thread->initial_argument = 0;
     else
         *(int*)(forked_thread->initial_argument) = *(int*)arg;
+*/
+    forked_thread->initial_argument = arg;
 
     forked_thread->stack_pointer = forked_thread->sp_btm + STACK_SIZE;
     forked_thread->state = RUNNING;
