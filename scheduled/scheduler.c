@@ -34,7 +34,7 @@ void print_thread(thread * thrd){
 }
 
 void scheduler_begin(){
-    printf("Allocating first TCB\n");
+    //printf("Allocating first TCB\n");
 
     //allocate a struct for when the main thread gets switched out
     current_thread = (thread*)malloc(sizeof(thread));
@@ -72,7 +72,7 @@ thread * thread_fork(void(*target)(void*), void * arg){
     }
     else {
 
-        printf("Allocating new TCB\n");
+        //printf("Allocating new TCB\n");
 
         forked_thread = (thread*)malloc(sizeof(thread));
         forked_thread->initial_function = target;
@@ -99,15 +99,14 @@ thread * thread_fork(void(*target)(void*), void * arg){
 
     thread_start(temp, forked_thread);
     
-    return current_thread;
+    return forked_thread;
 }
 
-void thread_join(struct thread * thrd){     //TODO: This function not working
+void thread_join(struct thread * thrd){
     mutex_lock(&(thrd->mtx));
     while(thrd->state != DONE){
         condition_wait(&(thrd->cond), &(thrd->mtx));
     }
-    condition_broadcast(&(thrd->cond));
     mutex_unlock(&(thrd->mtx));
 }
 
@@ -121,7 +120,6 @@ void scheduler_end(){
     while(!is_empty(&done_list)){
         temp = thread_dequeue(&done_list);
         temp->stack_pointer = NULL;
-        //free(temp->initial_argument);
         free(temp->sp_btm);
         free(temp);
     }
@@ -133,6 +131,7 @@ void scheduler_end(){
 void thread_wrap(){
     current_thread->initial_function(current_thread->initial_argument);
     current_thread->state = DONE;       //required for queue functionality
+    condition_broadcast(&(current_thread->cond));
     yield();
 }
 
@@ -140,7 +139,7 @@ void yield(){
     //printf("call to yield()\n");
     //print_thread(current_thread);
 
-    if(current_thread->state != DONE && current_thread->state != BLOCKED){
+    if(current_thread->state == RUNNING) {
         current_thread->state = READY;
         thread_enqueue(&ready_list, current_thread);
     }
@@ -153,6 +152,10 @@ void yield(){
 
     thread * temp = current_thread;
     current_thread = thread_dequeue(&ready_list);
+
+    if(!current_thread)
+        panic("ready_list returned null ptr!\n");
+
     current_thread->state = RUNNING;
 
     thread_switch(temp, current_thread);
