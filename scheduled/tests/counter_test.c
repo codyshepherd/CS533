@@ -54,5 +54,9 @@ int main(int argc, char**argv) {
   printf(array_consistent ? "results are consistent.\n" 
                           : "results are inconsistent!\n");
 
+    for(i=0; i < 5; ++i){       //added this loop to free memory and rule out
+        free(names[i]);         //memory leaks in my library
+    }
+
   return 0;
 }

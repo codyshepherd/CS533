@@ -129,5 +129,7 @@ int main(void) {
   printf("after sort: %s\n", check_sort(A));
 
   scheduler_end();
+    free(A->arr);       //added this line and next to free memory
+    free(A);            //and rule out memory leaks in my library
   return 0;
 }
