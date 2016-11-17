@@ -10,4 +10,4 @@ All test programs live in `scheduled/tests/`, and must be moved into `scheduled/
 
 `cd scheduled`
 
-`gcc \*.c \*.s -lrt`, plus any of your favorite warning or debugger flags.
+`gcc *.c *.s -lrt`, plus any of your favorite warning or debugger flags.
