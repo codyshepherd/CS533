@@ -34,7 +34,6 @@ void print_thread(thread * thrd){
 }
 
 void scheduler_begin(){
-    //printf("Allocating first TCB\n");
 
     //allocate a struct for when the main thread gets switched out
     current_thread = (thread*)malloc(sizeof(thread));
@@ -51,6 +50,7 @@ void scheduler_begin(){
 }
 
 thread * thread_fork(void(*target)(void*), void * arg){
+
     thread * forked_thread = NULL;
     thread * temp = NULL;
 
@@ -71,8 +71,6 @@ thread * thread_fork(void(*target)(void*), void * arg){
 
     }
     else {
-
-        //printf("Allocating new TCB\n");
 
         forked_thread = (thread*)malloc(sizeof(thread));
         forked_thread->initial_function = target;
@@ -103,6 +101,7 @@ thread * thread_fork(void(*target)(void*), void * arg){
 }
 
 void thread_join(struct thread * thrd){
+
     mutex_lock(&(thrd->mtx));
     while(thrd->state != DONE){
         condition_wait(&(thrd->cond), &(thrd->mtx));
@@ -129,6 +128,7 @@ void scheduler_end(){
 }
 
 void thread_wrap(){
+
     current_thread->initial_function(current_thread->initial_argument);
     current_thread->state = DONE;       //required for queue functionality
     condition_broadcast(&(current_thread->cond));
@@ -136,10 +136,8 @@ void thread_wrap(){
 }
 
 void yield(){
-    //printf("call to yield()\n");
-    //print_thread(current_thread);
 
-    if(current_thread->state == RUNNING) {
+    if(current_thread->state == RUNNING || current_thread->state == READY) {
         current_thread->state = READY;
         thread_enqueue(&ready_list, current_thread);
     }
@@ -169,12 +167,14 @@ void panic(char arg[]){
 
 
 void mutex_init(mutex * mtx){
+
     mtx->held = 0;
     mtx->waiting_threads.head = mtx->waiting_threads.tail = NULL;
     mtx->waiting_threads.count = 0;
 }
 
 void mutex_lock(mutex * mtx){
+
     if(mtx->held){
         current_thread->state = BLOCKED;
         thread_enqueue(&(mtx->waiting_threads), current_thread);
@@ -183,7 +183,9 @@ void mutex_lock(mutex * mtx){
     else
         mtx->held = 1;
 }
+
 void mutex_unlock(mutex * mtx){
+
     if(!is_empty(&(mtx->waiting_threads))){
         thread * temp = thread_dequeue(&(mtx->waiting_threads));
         temp->state = READY;
@@ -195,11 +197,13 @@ void mutex_unlock(mutex * mtx){
 }
 
 void condition_init(struct condition * cond){
+
     cond->waiting_threads.head = cond->waiting_threads.tail = NULL;
     cond->waiting_threads.count = 0;
 }
 
 void condition_wait(struct condition * cond, struct mutex * mtx){
+
     current_thread->state = BLOCKED;
     thread_enqueue(&(cond->waiting_threads), current_thread);
     mutex_unlock(mtx);
@@ -208,6 +212,7 @@ void condition_wait(struct condition * cond, struct mutex * mtx){
 }
 
 void condition_signal(struct condition * cond){
+
     if(!is_empty(&(cond->waiting_threads))){
         thread * temp = thread_dequeue(&(cond->waiting_threads));
         temp->state = READY;
@@ -216,6 +221,7 @@ void condition_signal(struct condition * cond){
 }
 
 void condition_broadcast(struct condition * cond){
+
     thread * temp = NULL;
     while(!is_empty(&(cond->waiting_threads))){
         temp = thread_dequeue(&(cond->waiting_threads));
