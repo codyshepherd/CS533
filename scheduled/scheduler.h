@@ -8,6 +8,9 @@
 #include "queue.h"
 
 
+#define current_thread (get_current_thread())
+
+
 typedef enum {
     RUNNING,    // The thread is currently running
     READY,      // The thread is not running, but is runnable

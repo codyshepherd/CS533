@@ -7,7 +7,7 @@
 
 const int STACK_SIZE = 1048576;
 
-struct thread * current_thread;
+//struct thread * current_thread;
 struct queue ready_list;        // Holds runnable threads
 struct queue blocked_list;
 struct queue done_list;         // Holds done threads waiting to be recycled
@@ -36,7 +36,7 @@ void print_thread(thread * thrd){
 void scheduler_begin(){
 
     //allocate a struct for when the main thread gets switched out
-    current_thread = (thread*)malloc(sizeof(thread));
+    set_current_thread( (thread*)malloc(sizeof(thread)) );
     current_thread->state = RUNNING;
 
     //null-initialize the queue pointers, because they're empty
@@ -93,7 +93,7 @@ thread * thread_fork(void(*target)(void*), void * arg){
 
     //swap out current thread and run it
     temp = current_thread;
-    current_thread = forked_thread;
+    set_current_thread( forked_thread );
 
     thread_start(temp, forked_thread);
     
@@ -122,7 +122,7 @@ void scheduler_end(){
         free(temp->sp_btm);
         free(temp);
     }
-    free(current_thread->initial_argument);
+    free(current_thread->initial_argument); //TODO: get rid of these?
     free(current_thread->sp_btm);
     free(current_thread);
 }
@@ -149,7 +149,7 @@ void yield(){
     }
 
     thread * temp = current_thread;
-    current_thread = thread_dequeue(&ready_list);
+    set_current_thread( thread_dequeue(&ready_list) );
 
     if(!current_thread)
         panic("ready_list returned null ptr!\n");
