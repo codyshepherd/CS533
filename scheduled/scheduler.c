@@ -6,6 +6,8 @@
 #define _GNU_SOURCE
 
 #include <sched.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include "scheduler.h"
 
 const int STACK_SIZE = 1048576;
@@ -50,6 +52,21 @@ void scheduler_begin(){
 
     mutex_init(&(current_thread->mtx));
     condition_init(&(current_thread->cond));
+
+    byte* sp = malloc(STACK_SIZE);
+    sp = sp + STACK_SIZE;
+
+    clone( kernel_thread_begin , sp, CLONE_THREAD | CLONE_VM | CLONE_SIGHAND | CLONE_FILES | CLONE_FS | CLONE_IO, NULL ); 
+}
+
+void kernel_thread_begin(){
+    thread* empty_thread = (thread*)malloc(sizeof(thread));
+    empty_thread->state = RUNNING;
+
+    set_current_thread( empty_thread );
+
+    while(1)
+        yield();
 }
 
 thread * thread_fork(void(*target)(void*), void * arg){

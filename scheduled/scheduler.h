@@ -42,6 +42,7 @@ typedef struct thread                   // struct representing a thread control 
 void print_thread(thread * thrd);
 
 void scheduler_begin();
+void kernel_thread_begin();
 thread * thread_fork(void(*target)(void*), void * arg);
 void thread_join(struct thread*);
 void yield();
