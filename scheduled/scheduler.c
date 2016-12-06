@@ -3,6 +3,9 @@
  * CS533 Course Project
  * scheduler.c
  */
+#define _GNU_SOURCE
+
+#include <sched.h>
 #include "scheduler.h"
 
 const int STACK_SIZE = 1048576;
