@@ -10,6 +10,24 @@
 #include <stdlib.h>
 #include "scheduler.h"
 
+#undef malloc
+#undef free
+void * safe_mem(int op, void * arg) {
+  static AO_TS_t spinlock = AO_TS_INITIALIZER;
+  void * result = 0;
+
+  spinlock_lock(&spinlock);
+  if(op == 0) {
+    result = malloc((size_t)arg);
+  } else {
+    free(arg);
+  }
+  spinlock_unlock(&spinlock);
+  return result;
+}
+#define malloc(arg) safe_mem(0, ((void*)(arg)))
+#define free(arg) safe_mem(1, arg)
+
 const int STACK_SIZE = 1048576;
 
 //struct thread * current_thread;
@@ -248,5 +266,13 @@ void condition_broadcast(struct condition * cond){
         temp->state = READY;
         thread_enqueue(&ready_list, temp);
     }
+}
+
+void spinlock_lock(AO_TS_t * lock){
+    while(AO_test_and_set_acquire(lock) != AO_TS_SET);
+}
+
+void spinlock_unlock(AO_TS_t * lock){
+    AO_CLEAR(lock);
 }
 

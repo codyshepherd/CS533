@@ -7,6 +7,9 @@
 #include <stdio.h>
 #include "queue.h"
 
+extern void * safe_mem(int, void*);
+#define malloc(arg) safe_mem(0, ((void*)(arg)))
+#define free(arg) safe_mem(1, arg)
 
 #define current_thread (get_current_thread())
 
@@ -63,6 +66,10 @@ void condition_wait(struct condition * cond, struct mutex * mtx);
 void condition_signal(struct condition * cond);
 void condition_broadcast(struct condition * cond);
 
+/*  ATOMIC LOCKS  */
+
+void spinlock_lock(AO_TS_t * ts);
+void spinlock_unlock(AO_TS_t * ts);
 
 /* GLOBALS */
 

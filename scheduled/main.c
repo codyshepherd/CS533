@@ -3,9 +3,9 @@
 //#define SLICE
 //#define TERM
 
-#include "scheduler.h"
 #include <unistd.h>
 #include <fcntl.h>
+#include "scheduler.h"
 
 //function that does some work
 void count_down(void * arg);
