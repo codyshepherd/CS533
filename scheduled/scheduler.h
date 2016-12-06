@@ -24,10 +24,12 @@ typedef enum {
 
 typedef struct mutex{
     int held;
+    AO_TS_t s;
     struct queue waiting_threads;
 } mutex;
 
 typedef struct condition{
+    AO_TS_t s;
     struct queue waiting_threads;
 } condition;
 
@@ -59,6 +61,8 @@ void panic(char arg[]);
 void mutex_init(mutex * mtx);
 void mutex_lock(mutex * mtx);
 void mutex_unlock(mutex * mtx);
+
+void block(AO_TS_t * spinlock);
 
 /*  CONDITION VARIABLE  */
 

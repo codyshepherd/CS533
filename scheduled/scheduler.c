@@ -240,10 +240,12 @@ void mutex_init(mutex * mtx){
 
 void mutex_lock(mutex * mtx){
 
+    spinlock_lock(&(mtx->s));
     if(mtx->held){
         current_thread->state = BLOCKED;
         thread_enqueue(&(mtx->waiting_threads), current_thread);
-        yield();
+        //yield();
+        block(&(mtx->s));
     }
     else
         mtx->held = 1;
@@ -251,14 +253,49 @@ void mutex_lock(mutex * mtx){
 
 void mutex_unlock(mutex * mtx){
 
+    spinlock_lock(&(mtx->s));
     if(!is_empty(&(mtx->waiting_threads))){
         thread * temp = thread_dequeue(&(mtx->waiting_threads));
         temp->state = READY;
+        spinlock_lock(&ready_list_lock);
         thread_enqueue(&ready_list, temp);
+        spinlock_unlock(&ready_list_lock);
     }
     else{
         mtx->held = 0;
     }
+    spinlock_unlock(&(mtx->s));
+}
+
+void block(AO_TS_t * spinlock){
+
+    spinlock_lock(&ready_list_lock);
+    spinlock_unlock(spinlock);
+    if(current_thread->state == RUNNING || current_thread->state == READY) {
+        current_thread->state = READY;
+        thread_enqueue(&ready_list, current_thread);
+    }
+    else if(current_thread->state == BLOCKED && is_empty(&ready_list)){
+        spinlock_unlock(&ready_list_lock);
+        panic("Blocking on empty ready list!\n");
+    }
+    else if (current_thread->state == DONE){
+        spinlock_lock(&done_list_lock);
+        thread_enqueue(&done_list, current_thread);
+        spinlock_unlock(&done_list_lock);
+    }
+
+    thread * temp = current_thread;
+    set_current_thread( thread_dequeue(&ready_list) );
+
+    if(!current_thread)
+        panic("ready_list returned null ptr!\n");
+
+    current_thread->state = RUNNING;
+
+    thread_switch(temp, current_thread);
+    spinlock_unlock(&ready_list_lock);
+
 }
 
 void condition_init(struct condition * cond){
@@ -269,30 +306,44 @@ void condition_init(struct condition * cond){
 
 void condition_wait(struct condition * cond, struct mutex * mtx){
 
+    spinlock_lock(&(cond->s));
+
     current_thread->state = BLOCKED;
     thread_enqueue(&(cond->waiting_threads), current_thread);
     mutex_unlock(mtx);
-    yield();
+    //yield();
+    block(&(cond->s));
     mutex_lock(mtx);
+
+    spinlock_unlock(&(cond->s));
 }
 
 void condition_signal(struct condition * cond){
+    spinlock_lock(&(cond->s));
 
     if(!is_empty(&(cond->waiting_threads))){
         thread * temp = thread_dequeue(&(cond->waiting_threads));
         temp->state = READY;
+        spinlock_lock(&ready_list_lock);
         thread_enqueue(&ready_list, temp);
+        spinlock_unlock(&ready_list_lock);
     }
+
+    spinlock_unlock(&(cond->s));
 }
 
 void condition_broadcast(struct condition * cond){
+    spinlock_lock(&(cond->s));
 
     thread * temp = NULL;
     while(!is_empty(&(cond->waiting_threads))){
         temp = thread_dequeue(&(cond->waiting_threads));
         temp->state = READY;
+        spinlock_lock(&ready_list_lock);
         thread_enqueue(&ready_list, temp);
+        spinlock_unlock(&ready_list_lock);
     }
+    spinlock_unlock(&(cond->s));
 }
 
 void spinlock_lock(AO_TS_t * lock){
