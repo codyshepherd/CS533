@@ -2,7 +2,7 @@
 #void thread_switch(thread * old, thread * new)
 .globl thread_switch
 
-thread_switch:
+thread_switch:               #ready list lock must be held when entering this routine
     pushq %rbx               #push callee-save registers onto stack
     pushq %rbp
     pushq %r12
@@ -22,7 +22,7 @@ thread_switch:
 #void thread_start(thread * old, thread * new);
 .globl thread_start
 
-thread_start:
+thread_start:                #ready list lock must be held when entering this routine
     pushq %rbx               #push callee-save registers onto stack
     pushq %rbp
     pushq %r12

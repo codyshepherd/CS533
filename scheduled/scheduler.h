@@ -4,6 +4,7 @@
  * scheduler.h
  */
 #include <stdlib.h>  
+#include <atomic_ops.h>
 #include <stdio.h>
 #include "queue.h"
 

@@ -27,7 +27,7 @@ int main(int argc, char * argv[]){
   thread_fork(count_down, &n1);
   thread_fork(count_down, &n2);
   thread_fork(count_down, &n3);
-  thread_fork(wrap_read_wrap, &fd);
+  //thread_fork(wrap_read_wrap, &fd);
   thread_fork(count_down, &n4);
   thread_fork(count_down, &n5);
   thread_fork(count_down, &n7);

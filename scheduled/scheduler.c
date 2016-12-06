@@ -6,6 +6,7 @@
 #define _GNU_SOURCE
 
 #include <sched.h>
+#include <atomic_ops.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "scheduler.h"
@@ -32,9 +33,15 @@ const int STACK_SIZE = 1048576;
 
 //struct thread * current_thread;
 struct queue ready_list;        // Holds runnable threads
-struct queue blocked_list;
-struct queue done_list;         // Holds done threads waiting to be recycled
+AO_TS_t ready_list_lock;
 
+struct queue blocked_list;
+AO_TS_t blocked_list_lock;
+
+struct queue done_list;         // Holds done threads waiting to be recycled
+AO_TS_t done_list_lock;
+
+AO_TS_t print_lock;
 
 void print_thread(thread * thrd){
     switch(thrd->state){
@@ -92,19 +99,25 @@ thread * thread_fork(void(*target)(void*), void * arg){
     thread * forked_thread = NULL;
     thread * temp = NULL;
 
+    spinlock_lock(&done_list_lock);
     while(done_list.count > 9){             //Trim the recycle queue
+        spinlock_lock(&print_lock);
         printf("Trimming dead queue\n");   
+        spinlock_unlock(&print_lock);
         temp = thread_dequeue(&done_list);
         temp->stack_pointer = NULL;
         free(temp->initial_argument);
         free(temp->sp_btm);
         free(temp);
     }
+    spinlock_unlock(&done_list_lock);
     temp = NULL;
 
+    spinlock_lock(&done_list_lock);
     if(!is_empty(&done_list)){      // Check on the recyclable list first
 
         forked_thread = thread_dequeue(&done_list);
+        spinlock_unlock(&done_list_lock);
         forked_thread->initial_function = target;
 
     }
@@ -127,6 +140,7 @@ thread * thread_fork(void(*target)(void*), void * arg){
     current_thread->state = READY;
     
     //enqueue currently running thread
+    spinlock_lock(&ready_list_lock);
     thread_enqueue(&ready_list, current_thread);
 
     //swap out current thread and run it
@@ -135,6 +149,7 @@ thread * thread_fork(void(*target)(void*), void * arg){
 
     thread_start(temp, forked_thread);
     
+    spinlock_unlock(&ready_list_lock);
     return forked_thread;
 }
 
@@ -149,23 +164,31 @@ void thread_join(struct thread * thrd){
 
 void scheduler_end(){
 
+    spinlock_lock(&ready_list_lock);
     while(!is_empty(&ready_list)){
+        spinlock_unlock(&ready_list_lock);
         yield();
+        spinlock_lock(&ready_list_lock);
     }
+    spinlock_unlock(&ready_list_lock);
     
     thread * temp;
+    spinlock_lock(&done_list_lock);
     while(!is_empty(&done_list)){
         temp = thread_dequeue(&done_list);
         temp->stack_pointer = NULL;
         free(temp->sp_btm);
         free(temp);
     }
+    spinlock_unlock(&done_list_lock);
     free(current_thread->initial_argument); //TODO: get rid of these?
     free(current_thread->sp_btm);
     free(current_thread);
 }
 
 void thread_wrap(){
+
+    spinlock_unlock(&ready_list_lock);
 
     current_thread->initial_function(current_thread->initial_argument);
     current_thread->state = DONE;       //required for queue functionality
@@ -183,7 +206,9 @@ void yield(){
         panic("Blocking on empty ready list!\n");
     }
     else if (current_thread->state == DONE){
+        spinlock_lock(&done_list_lock);
         thread_enqueue(&done_list, current_thread);
+        spinlock_unlock(&done_list_lock);
     }
 
     thread * temp = current_thread;
@@ -194,7 +219,9 @@ void yield(){
 
     current_thread->state = RUNNING;
 
+    spinlock_lock(&ready_list_lock);
     thread_switch(temp, current_thread);
+    spinlock_unlock(&ready_list_lock);
 }
 
 
