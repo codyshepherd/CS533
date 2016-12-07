@@ -25,7 +25,7 @@ typedef enum {
 } state_t;
 
 typedef struct mutex{
-    int held;
+    struct thread* held;
     AO_TS_t s;
     struct queue waiting_threads;
 } mutex;

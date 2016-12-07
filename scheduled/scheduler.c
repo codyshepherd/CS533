@@ -93,6 +93,9 @@ void kernel_thread_begin(){
     thread* empty_thread = (thread*)malloc(sizeof(thread));
     empty_thread->state = RUNNING;
 
+    mutex_init(&(empty_thread->mtx));
+    condition_init(&(empty_thread->cond));
+
     //struct mapping* entry = (struct mapping*)malloc(sizeof(struct mapping));
 
     //entry->t = (thread*)malloc(sizeof(thread));
@@ -169,6 +172,7 @@ void thread_join(struct thread * thrd){
     while(thrd->state != DONE){
         condition_wait(&(thrd->cond), &(thrd->mtx));
     }
+    //condition_broadcast(&(thrd->cond));
     mutex_unlock(&(thrd->mtx));
 }
 
@@ -191,7 +195,7 @@ void scheduler_end(){
         free(temp);
     }
     spinlock_unlock(&done_list_lock);
-    free(current_thread->initial_argument); //TODO: get rid of these?
+    free(current_thread->initial_argument);
     free(current_thread->sp_btm);
     free(current_thread);
 }
@@ -250,7 +254,7 @@ void panic(char arg[]){
 
 void mutex_init(mutex * mtx){
 
-    mtx->held = 0;
+    mtx->held = NULL;
     mtx->s = AO_TS_INITIALIZER;
     mtx->waiting_threads.head = mtx->waiting_threads.tail = NULL;
     mtx->waiting_threads.count = 0;
@@ -260,13 +264,13 @@ void mutex_lock(mutex * mtx){
 
     spinlock_lock(&(mtx->s));
     if(mtx->held){
-        current_thread->state = BLOCKED;
         thread_enqueue(&(mtx->waiting_threads), current_thread);
+        current_thread->state = BLOCKED;
         //yield();
         block(&(mtx->s));
     }
     else{
-        mtx->held = 1;
+        mtx->held = current_thread;
         spinlock_unlock(&(mtx->s));
     }
 }
@@ -276,13 +280,14 @@ void mutex_unlock(mutex * mtx){
     spinlock_lock(&(mtx->s));
     if(!is_empty(&(mtx->waiting_threads))){
         thread * temp = thread_dequeue(&(mtx->waiting_threads));
-        temp->state = READY;
         spinlock_lock(&ready_list_lock);
+        temp->state = READY;
+        mtx->held = temp;
         thread_enqueue(&ready_list, temp);
         spinlock_unlock(&ready_list_lock);
     }
     else{
-        mtx->held = 0;
+        mtx->held = NULL;
     }
     spinlock_unlock(&(mtx->s));
 }
@@ -317,8 +322,10 @@ void block(AO_TS_t * lock){
     thread * temp = current_thread;
     set_current_thread( thread_dequeue(&ready_list) );
 
-    if(!current_thread)
+    if(!current_thread){
+        spinlock_unlock(&ready_list_lock);
         panic("ready_list returned null ptr!\n");
+    }
 
     current_thread->state = RUNNING;
 
