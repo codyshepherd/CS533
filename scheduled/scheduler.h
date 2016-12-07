@@ -12,6 +12,8 @@ extern void * safe_mem(int, void*);
 #define malloc(arg) safe_mem(0, ((void*)(arg)))
 #define free(arg) safe_mem(1, arg)
 
+extern struct thread * get_current_thread();
+extern void set_current_thread(struct thread*);
 #define current_thread (get_current_thread())
 
 
@@ -47,7 +49,7 @@ typedef struct thread                   // struct representing a thread control 
 
 void print_thread(thread * thrd);
 
-void scheduler_begin();
+void scheduler_begin(int kernel_threads);
 void kernel_thread_begin();
 thread * thread_fork(void(*target)(void*), void * arg);
 void thread_join(struct thread*);

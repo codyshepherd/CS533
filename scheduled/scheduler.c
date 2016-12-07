@@ -33,15 +33,15 @@ const int STACK_SIZE = 1048576;
 
 //struct thread * current_thread;
 struct queue ready_list;        // Holds runnable threads
-AO_TS_t ready_list_lock;
+AO_TS_t ready_list_lock = AO_TS_INITIALIZER;
 
 struct queue blocked_list;
-AO_TS_t blocked_list_lock;
+AO_TS_t blocked_list_lock = AO_TS_INITIALIZER;
 
 struct queue done_list;         // Holds done threads waiting to be recycled
-AO_TS_t done_list_lock;
+AO_TS_t done_list_lock = AO_TS_INITIALIZER;
 
-AO_TS_t print_lock;
+AO_TS_t print_lock = AO_TS_INITIALIZER;
 
 void print_thread(thread * thrd){
     switch(thrd->state){
@@ -63,7 +63,7 @@ void print_thread(thread * thrd){
     }
 }
 
-void scheduler_begin(){
+void scheduler_begin(int kernel_threads){
 
     //allocate a struct for when the main thread gets switched out
     set_current_thread( (thread*)malloc(sizeof(thread)) );
@@ -78,15 +78,24 @@ void scheduler_begin(){
     mutex_init(&(current_thread->mtx));
     condition_init(&(current_thread->cond));
 
-    byte* sp = malloc(STACK_SIZE);
-    sp = sp + STACK_SIZE;
+    byte* sp;
 
-    clone( kernel_thread_begin , sp, CLONE_THREAD | CLONE_VM | CLONE_SIGHAND | CLONE_FILES | CLONE_FS | CLONE_IO, NULL ); 
+    int i = 0;
+    for(i = 0; i < kernel_threads; ++i){     //for loop and function arg for arbitrary number of kernel threads
+        sp = malloc(STACK_SIZE);
+        sp = sp + STACK_SIZE;
+        
+        clone( kernel_thread_begin , sp, CLONE_THREAD | CLONE_VM | CLONE_SIGHAND | CLONE_FILES | CLONE_FS | CLONE_IO, NULL ); 
+    }
 }
 
 void kernel_thread_begin(){
     thread* empty_thread = (thread*)malloc(sizeof(thread));
     empty_thread->state = RUNNING;
+
+    //struct mapping* entry = (struct mapping*)malloc(sizeof(struct mapping));
+
+    //entry->t = (thread*)malloc(sizeof(thread));
 
     set_current_thread( empty_thread );
 
@@ -110,18 +119,20 @@ thread * thread_fork(void(*target)(void*), void * arg){
         free(temp->sp_btm);
         free(temp);
     }
-    spinlock_unlock(&done_list_lock);
     temp = NULL;
 
-    spinlock_lock(&done_list_lock);
     if(!is_empty(&done_list)){      // Check on the recyclable list first
 
         forked_thread = thread_dequeue(&done_list);
-        spinlock_unlock(&done_list_lock);
         forked_thread->initial_function = target;
 
+        spinlock_unlock(&done_list_lock);
+        spinlock_lock(&ready_list_lock);
     }
     else {
+
+        spinlock_unlock(&done_list_lock);
+        spinlock_lock(&ready_list_lock);
 
         forked_thread = (thread*)malloc(sizeof(thread));
         forked_thread->initial_function = target;
@@ -140,7 +151,6 @@ thread * thread_fork(void(*target)(void*), void * arg){
     current_thread->state = READY;
     
     //enqueue currently running thread
-    spinlock_lock(&ready_list_lock);
     thread_enqueue(&ready_list, current_thread);
 
     //swap out current thread and run it
@@ -198,28 +208,35 @@ void thread_wrap(){
 
 void yield(){
 
+    spinlock_lock(&ready_list_lock);
     if(current_thread->state == RUNNING || current_thread->state == READY) {
         current_thread->state = READY;
         thread_enqueue(&ready_list, current_thread);
     }
     else if(current_thread->state == BLOCKED && is_empty(&ready_list)){
+        spinlock_unlock(&ready_list_lock);
         panic("Blocking on empty ready list!\n");
     }
     else if (current_thread->state == DONE){
+        spinlock_unlock(&ready_list_lock);
+
         spinlock_lock(&done_list_lock);
         thread_enqueue(&done_list, current_thread);
         spinlock_unlock(&done_list_lock);
+
+        spinlock_lock(&ready_list_lock);
     }
 
     thread * temp = current_thread;
     set_current_thread( thread_dequeue(&ready_list) );
 
-    if(!current_thread)
+    if(!current_thread){
+        spinlock_unlock(&ready_list_lock);
         panic("ready_list returned null ptr!\n");
+    }
 
     current_thread->state = RUNNING;
 
-    spinlock_lock(&ready_list_lock);
     thread_switch(temp, current_thread);
     spinlock_unlock(&ready_list_lock);
 }
@@ -234,6 +251,7 @@ void panic(char arg[]){
 void mutex_init(mutex * mtx){
 
     mtx->held = 0;
+    mtx->s = AO_TS_INITIALIZER;
     mtx->waiting_threads.head = mtx->waiting_threads.tail = NULL;
     mtx->waiting_threads.count = 0;
 }
@@ -247,8 +265,10 @@ void mutex_lock(mutex * mtx){
         //yield();
         block(&(mtx->s));
     }
-    else
+    else{
         mtx->held = 1;
+        spinlock_unlock(&(mtx->s));
+    }
 }
 
 void mutex_unlock(mutex * mtx){
@@ -267,10 +287,15 @@ void mutex_unlock(mutex * mtx){
     spinlock_unlock(&(mtx->s));
 }
 
-void block(AO_TS_t * spinlock){
+void block(AO_TS_t * lock){
+
+    //spinlock_lock(&print_lock);
+    //printf("in block\n");
+    //spinlock_unlock(&print_lock);
 
     spinlock_lock(&ready_list_lock);
-    spinlock_unlock(spinlock);
+    spinlock_unlock(lock);
+
     if(current_thread->state == RUNNING || current_thread->state == READY) {
         current_thread->state = READY;
         thread_enqueue(&ready_list, current_thread);
@@ -280,9 +305,13 @@ void block(AO_TS_t * spinlock){
         panic("Blocking on empty ready list!\n");
     }
     else if (current_thread->state == DONE){
+        spinlock_unlock(&ready_list_lock);
+
         spinlock_lock(&done_list_lock);
         thread_enqueue(&done_list, current_thread);
         spinlock_unlock(&done_list_lock);
+
+        spinlock_lock(&ready_list_lock);
     }
 
     thread * temp = current_thread;
@@ -300,6 +329,7 @@ void block(AO_TS_t * spinlock){
 
 void condition_init(struct condition * cond){
 
+    cond->s = AO_TS_INITIALIZER;
     cond->waiting_threads.head = cond->waiting_threads.tail = NULL;
     cond->waiting_threads.count = 0;
 }
@@ -315,14 +345,15 @@ void condition_wait(struct condition * cond, struct mutex * mtx){
     block(&(cond->s));
     mutex_lock(mtx);
 
-    spinlock_unlock(&(cond->s));
+    //spinlock_unlock(&(cond->s));
 }
 
 void condition_signal(struct condition * cond){
     spinlock_lock(&(cond->s));
 
+    thread * temp = NULL;
     if(!is_empty(&(cond->waiting_threads))){
-        thread * temp = thread_dequeue(&(cond->waiting_threads));
+        temp = thread_dequeue(&(cond->waiting_threads));
         temp->state = READY;
         spinlock_lock(&ready_list_lock);
         thread_enqueue(&ready_list, temp);
@@ -347,7 +378,7 @@ void condition_broadcast(struct condition * cond){
 }
 
 void spinlock_lock(AO_TS_t * lock){
-    while(AO_test_and_set_acquire(lock) != AO_TS_SET);
+    while(AO_test_and_set_acquire(lock) != AO_TS_CLEAR);
 }
 
 void spinlock_unlock(AO_TS_t * lock){
